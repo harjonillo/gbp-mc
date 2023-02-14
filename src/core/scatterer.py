@@ -11,7 +11,7 @@ random locations and at bravais lattice points
 
 import numpy as np
 import matplotlib.pyplot as pl
-import gbpmc.intersectFast as intersect
+from . import intersect
 import miepython as mp
 from tqdm import tqdm
 
@@ -179,7 +179,6 @@ class RandomScatteringMedium(ScatteringMedium):
         intersect_index_pairs = intersect.get_indices(intersects)
         num_overlaps = intersect_index_pairs.shape[0]
 
-        # print(intersect_index_pairs)
         print(f'num overlaps: {num_overlaps}')
 
         if num_overlaps > 0 and num_overlaps < int(1E5):
@@ -230,7 +229,6 @@ class RandomScatteringMedium(ScatteringMedium):
 
         if self.heterogenous == True:
             num_particles = centers.shape[1]
-            print(f'num_particles: {num_particles}')
             particle_g = np.zeros(shape=num_particles)
             last = 0
             for i in range(len(g_list)):
@@ -308,17 +306,13 @@ class LatticeScatteringMedium(ScatteringMedium):
         self.update_info()
 
     def init_structure(self):
-        if self.scattering_degree == 0:
-            self.particle_centers = np.array([])
-
-        elif self.space_structure in ['cubic', 'orthorhombic', 'tetragonal']:
+        if self.space_structure in ['cubic', 'orthorhombic', 'tetragonal']:
             a, angles = self.cuboid()
             nx = int(self.width / a[0, 0])
             ny = int(self.height / a[1, 1])
             nz = int(self.depth / a[2, 2])
-            print(a, angles)
-            print(nx, ny, nz)
             space_lattice = self.create_space_lattice(a, nx, ny, nz)
+            
             sc_centers = self.ravel_ijk(space_lattice)
             sc_centers = sc_centers.T
 
@@ -326,16 +320,11 @@ class LatticeScatteringMedium(ScatteringMedium):
             sc_centers[0] += self.bounds[0, 0]
             sc_centers[1] += self.bounds[1, 0]
             sc_centers[2] += self.bounds[2, 0]
-            # ave_particle_radii = np.average(self.particle_radii)
-            # in_bounds_x = np.abs(sc_centers[0]) < (self.bounds[0,1]
-            #                                        - ave_particle_radii)
-            # in_bounds_y = np.abs(sc_centers[1]) < (self.bounds[1,1]
-            #                                        - ave_particle_radii)
-            # in_bounds_z = np.abs(sc_centers[2]) < (self.bounds[2,1]
-            #                                        - ave_particle_radii)
-            # in_bounds = in_bounds_x & in_bounds_y & in_bounds_z
-            # self.particle_centers = sc_centers[:, in_bounds]
+
             self.particle_centers = sc_centers
+
+            if self.basis_structure is not None:
+                basis_lattice = self.create_basis_lattice()
 
         else:
             raise InitializationException
@@ -386,24 +375,24 @@ class LatticeScatteringMedium(ScatteringMedium):
 
         return a, angles
 
-    def create_space_lattice(self, a, nx, ny, nz, update_info=True):
+    def create_space_lattice(self, a, nx, ny, nz):
         R = np.zeros(shape=(nx, ny, nz, 3))
         # the lattice points are described by R. Mathematically,
         # R[n1,n2,n3] = n1*a1 + n2*a2 + n3*a3, where ai are vectors.
         # R[n1,n2,n3] give the cartesian coordinates of the lattice point
         # indexed by n1, n2, and n3, ie R[n1,n2,n3] has the shape (3,).
         x0, y0, z0 = self.bounds[:, 0]
-        print(x0, y0, z0)
+
         for i in range(nx):
             for j in range(ny):
                 for k in range(nz):
                     R[i, j, k] = i * a[0, :] + j * a[1, :] + k * a[2, :]
 
-        if update_info is True:
-            self.space_lattice = R
+        self.space_lattice = R
+        
         return R
 
-    def create_basis_lattice(self, update_info=True):
+    def create_basis_lattice(self):
         '''
         Creates another lattice from the basis such that the complete lattice
         is obtained by superimposing the output and the space lattice S.
@@ -438,8 +427,7 @@ class LatticeScatteringMedium(ScatteringMedium):
             & (basis_latt[:, 1] <= ymax) & (basis_latt[:, 1] >= ymin) \
             & (basis_latt[:, 2] <= zmax) & (basis_latt[:, 2] >= zmin)
 
-        if update_info is True:
-            self.basis_lattice = basis_latt[in_ccell]
+        self.basis_lattice = basis_latt[in_ccell]
 
         return basis_latt[in_ccell]
 
@@ -447,27 +435,37 @@ class LatticeScatteringMedium(ScatteringMedium):
         space_cc = self.space_lattice[:2, :2, :2]
         centers = self.ravel_ijk(space_cc)
         if self.basis_structure is None:
-            self.basis_structure = np.zeros(shape=(1, 3))
+            basis_structure = np.zeros(shape=(1, 3))
+        else:
+            basis_structure = self.basis_structure
 
-        M = self.basis_structure.shape[0]
+        M = basis_structure.shape[0]
         N = centers.shape[0]
         basis_cc = np.zeros(shape=(M * N, 3))
         m = 0
-        for atom in self.basis_structure:
+        for atom in basis_structure:
             basis_cc[m:m+N] = np.sum([centers, atom], axis=0)
             m += N
 
         xmax, xmin = np.amax(centers[:, 0]), np.amin(centers[:, 0])
         ymax, ymin = np.amax(centers[:, 1]), np.amin(centers[:, 1])
         zmax, zmin = np.amax(centers[:, 2]), np.amin(centers[:, 2])
-        in_ccell = (basis_cc[:, 0] <= xmax) & (basis_cc[:, 0] >= xmin) \
-            & (basis_cc[:, 1] <= ymax) & (basis_cc[:, 1] >= ymin) \
+
+        in_ccell_s = (
+            (centers[:, 0] <= xmax) & (centers[:, 0] >= xmin)
+            & (centers[:, 1] <= ymax) & (centers[:, 1] >= ymin)
+            & (centers[:, 2] <= zmax) & (centers[:, 2] >= zmin)
+        )
+        in_ccell_b = (
+            (basis_cc[:, 0] <= xmax) & (basis_cc[:, 0] >= xmin)
+            & (basis_cc[:, 1] <= ymax) & (basis_cc[:, 1] >= ymin)
             & (basis_cc[:, 2] <= zmax) & (basis_cc[:, 2] >= zmin)
+        )
 
-        return centers.T, basis_cc[in_ccell].T
+        return centers[in_ccell_s].T, basis_cc[in_ccell_b].T
 
-    def plot(self, space, basis=None):
-        xs, ys, zs = space
+    def plot(self, space_lattice, basis_lattice=None):
+        xs, ys, zs = space_lattice.T
 
         fig = pl.figure()
         ax = pl.subplot2grid((2, 3), (0, 1), projection='3d',
@@ -485,13 +483,11 @@ class LatticeScatteringMedium(ScatteringMedium):
         ax3.set_xlabel('x')
         ax3.set_ylabel('z')
 
-        if basis is not None:
-            if np.sum(basis - 1) == 0:
-                basis = None
+        if basis_lattice is not None:
+            if self.basis_lattice is None:
+                print("Initial object originally has no basis lattice")
 
-        if basis is not None:
-            print(np.sum(basis - 1))
-            xb, yb, zb = basis
+            xb, yb, zb = basis_lattice.T
             ax.scatter(xb, yb, zb, color='C2')
             ax2.plot(xb, yb, '.', color='C2')
             ax3.plot(xb, zb, '.', color='C2')

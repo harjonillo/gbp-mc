@@ -15,7 +15,7 @@ import os
 from scipy.special import expit, jv
 from scipy.integrate import quad
 
-from . import intersectFast as intersect
+import intersect
 
 
 class FocusedGaussianBeam:
@@ -518,10 +518,7 @@ class FocusedGaussianBeamMC(FocusedGaussianBeam):
 
             filename = self.filename + 't%d.npz' % (self.step_param, trial_num)
             filename = filename.replace('+', "")
-            homedir = os.path.expanduser("~")
-            THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
-            my_file = os.path.join(homedir, THIS_FOLDER)
-            my_file = os.path.join(my_file, filename)
+            my_file = f"data/random_scattering/{filename}"
             print('saving '+str(my_file))
             with open(my_file, "wb") as input_file:
                 np.savez(input_file, vars=vars, **kwargs)
