@@ -15,7 +15,7 @@ import os
 from scipy.special import expit, jv
 from scipy.integrate import quad
 
-import intersect
+from src.core import intersect
 
 
 class FocusedGaussianBeam:

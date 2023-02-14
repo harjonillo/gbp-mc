@@ -11,7 +11,7 @@ random locations and at bravais lattice points
 
 import numpy as np
 import matplotlib.pyplot as pl
-from . import intersect
+from src.core import intersect
 import miepython as mp
 from tqdm import tqdm
 
