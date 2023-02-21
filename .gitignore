@@ -1,3 +1,14 @@
 .DS_Store
-data/
+**/__pycache__/
+*/.ipynb_checkpoints/*
+*/.DS_Store
 
+main.py
+data/
+notebooks/calibration_water.ipynb
+notebooks/comp_complexity.ipynb
+notebooks/miepython test.ipynb
+notebooks/ray-scatter-stats - the real thing-Copy3.ipynb
+notebooks/runtime analysis.ipynb
+notebooks/test.ipynb
+notebooks/varying_numphotons-snr.ipynb
