@@ -288,7 +288,7 @@ class FocusedGaussianBeamMC(FocusedGaussianBeam):
         self.num_iter = int(num_iterations)
         self.num_steps = num_steps
         self.axial_resolution = int(axial_resolution)
-        img_limit = self.focal_tolerance * 30
+        img_limit = self.focal_tolerance * 2
         self.axial_img_range = (z_f-img_limit, z_f+img_limit)
         self.trans_img_range = (-img_limit, img_limit)
 
@@ -451,11 +451,9 @@ class FocusedGaussianBeamMC(FocusedGaussianBeam):
         # print("propagating...")
         for step in range(0, self.num_steps-1):
             mu[:, :, step], s = self.update_in_free_space(r[:, :, step],
-                                                          mu[:, :, step],
                                                           at_focus_x,
                                                           at_focus_y)
-            r[:, :, step+1] = self.move(r[:, :, step], mu[:, :, step],
-                                        at_focus_x, at_focus_y, s)
+            r[:, :, step+1] = self.move(r[:, :, step], mu[:, :, step], s)
         return r
 
     def calculate_paths(self, R):
