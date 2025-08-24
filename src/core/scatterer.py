@@ -12,7 +12,7 @@ random locations and at bravais lattice points
 import numpy as np
 import matplotlib.pyplot as pl
 from src.core import intersect
-import miepython as mp
+import miepython as mie
 from tqdm import tqdm
 
 
@@ -53,7 +53,7 @@ class ScatteringMedium(object):
 
         theta = np.linspace(-180, 180, 1000)
         mu = np.cos(theta/180*np.pi)
-        scat = mp.i_unpolarized(m, x, mu)
+        scat = mie.i_unpolarized(m, x, mu)
         # normalize scat over area
         scat = scat / np.sum(scat)
 
@@ -70,8 +70,6 @@ class ScatteringMedium(object):
         if self.structure == 'lattice':
             del self.__basic_props__['space_lattice']
             del self.__basic_props__['basis_lattice']
-
-        print(self.__basic_props__)
 
 
 class RandomScatteringMedium(ScatteringMedium):
@@ -105,8 +103,10 @@ class RandomScatteringMedium(ScatteringMedium):
             # d_s = 1 / (particle density * scattering cross section) where
             # scattering cross section (rayleigh) is 8/3 q**4 pi r**2
             self.scattering_degree = scattering_degree
-            qext, qsca, qback, g = mp.mie(self.particle_index/env_index,
-                                          self.size_param)
+            qext, qsca, qback, g = mie.efficiencies_mx(
+                self.particle_index/env_index,
+                self.size_param
+            )
             self.qsca = qsca
             self.qext = qext
             self.g = g
@@ -114,16 +114,21 @@ class RandomScatteringMedium(ScatteringMedium):
             A = np.pi * self.particle_radii ** 2
             self.scattering_cross_section = qsca * A
             self.radii_eff = np.sqrt(self.scattering_cross_section / np.pi)
-            self.density = self.scattering_degree / \
+            self.density = (
+                self.scattering_degree /
                 (self.depth*10 * self.scattering_cross_section)
-            self.num_particles = np.int(self.density * self.volume)
-            self.particle_anisotropies = g * \
-                np.ones(shape=(self.num_particles,))
+            )
+            self.num_particles = np.int_(self.density * self.volume)
+            self.particle_anisotropies = (
+                g * np.ones(shape=(self.num_particles,))
+            )
             if isinstance(self.particle_radii, (list, tuple, np.ndarray)) is False:
-                self.particle_radii = self.particle_radii * \
-                    np.ones(shape=(self.num_particles,))
-                self.radii_eff = self.radii_eff * \
-                    np.ones(shape=(self.num_particles,))
+                self.particle_radii = (
+                    self.particle_radii * np.ones(shape=(self.num_particles,))
+                )
+                self.radii_eff = (
+                    self.radii_eff * np.ones(shape=(self.num_particles,))
+                )
 
         self.init_structure()
         self.update_info()
@@ -160,7 +165,7 @@ class RandomScatteringMedium(ScatteringMedium):
 
         # scatterer density is related to h/ds
         N = self.num_particles
-        n = np.arange(0, N, dtype=np.int)
+        n = np.arange(0, N, dtype=int)
         centers = np.zeros(shape=(3, N))
 
         centers[0] = np.random.uniform(xb[0], xb[1], size=(N,))
@@ -195,10 +200,12 @@ class RandomScatteringMedium(ScatteringMedium):
                     new_center[2] = np.random.uniform(zb[0], zb[1])
 
                     # make sure no spheres overlap
-                    new_intersects = intersect.sphere_sphere(new_center,
-                                                             centers,
-                                                             radii[tagged],
-                                                             radii)
+                    new_intersects = intersect.sphere_sphere(
+                        new_center,
+                        centers,
+                        radii[tagged],
+                        radii
+                    )
                     new_intersect_indices = intersect.get_indices(new_intersects)
                     new_num_overlaps = new_intersect_indices.shape[0]
 
@@ -208,8 +215,10 @@ class RandomScatteringMedium(ScatteringMedium):
                         break
 
                 if success == 0:
-                    print(f'Limit of attempts reached. Will not change \
-                          location of sphere {tagged}.')
+                    print(
+                        f'Limit of attempts reached. Will not change \
+                          location of sphere {tagged}.'
+                    )
 
         elif num_overlaps > int(1E4):
             print('Too many overlaps. Will ignore this function call.')
@@ -248,9 +257,15 @@ class LatticeScatteringMedium(ScatteringMedium):
                  particle_index, env_index, basis_structure=None,
                  lattice_constants=None, scattering_degree=None,
                  conv_cell=False):
-        ScatteringMedium.__init__(self, bounds=bounds, size_param=size_param,
-                                  particle_radii=particle_radii,
-                                  particle_index=particle_index)
+
+        ScatteringMedium.__init__(
+            self, 
+            bounds=bounds, 
+            size_param=size_param,
+            particle_radii=particle_radii,
+            particle_index=particle_index
+        )
+
         self.structure = 'lattice'
         self.space_structure = space_structure
         self.basis_structure = basis_structure
@@ -263,8 +278,10 @@ class LatticeScatteringMedium(ScatteringMedium):
         if lattice_constants is None:
             if scattering_degree is not None:
                 self.scattering_degree = scattering_degree
-                qext, qsca, qback, g = mp.mie(self.particle_index/env_index,
-                                              self.size_param)
+                qext, qsca, qback, g = mie.efficiencies_mx(
+                    self.particle_index/env_index,
+                    self.size_param
+                )
                 self.qsca = qsca
                 self.qext = qext
                 self.g = g
@@ -275,21 +292,28 @@ class LatticeScatteringMedium(ScatteringMedium):
                 self.scattering_cross_section = qsca * A
                 self.radii_eff = np.sqrt(self.scattering_cross_section / np.pi)
 
-                self.density = self.scattering_degree / \
+                self.density = (
+                    self.scattering_degree / 
                     (self.depth*10 * self.scattering_cross_section)
-                self.num_particles = np.int(self.density * self.volume)
-                self.particle_anisotropies = g \
-                    * np.ones(shape=(self.num_particles,))
+                )
+                self.num_particles = np.int_(self.density * self.volume)
+                self.particle_anisotropies = (
+                    g * np.ones(shape=(self.num_particles,))
+                )
 
-                if isinstance(self.particle_radii,
-                              (list, tuple, np.ndarray)) is False:
-                    self.particle_radii = self.particle_radii \
-                        * np.ones(shape=(self.num_particles,))
+                if isinstance(
+                    self.particle_radii, (list, tuple, np.ndarray)
+                ) is False:
+                    self.particle_radii = (
+                        self.particle_radii * np.ones(shape=(self.num_particles,))
+                    )
 
-                if isinstance(self.radii_eff,
-                              (list, tuple, np.ndarray)) is False:
-                    self.radii_eff = self.radii_eff \
-                        * np.ones(shape=(self.num_particles,))
+                if isinstance(
+                    self.radii_eff, (list, tuple, np.ndarray)
+                ) is False:
+                    self.radii_eff = (
+                        self.radii_eff * np.ones(shape=(self.num_particles,))
+                    )
                 self.lattice_constants = None
             else:
                 self.density = density
@@ -414,11 +438,11 @@ class LatticeScatteringMedium(ScatteringMedium):
         centers = self.ravel_ijk(self.space_lattice)
         N = centers.shape[0]
         basis_latt = np.zeros(shape=(M * N, 3))
-        m = 0
-        for atom in basis:
-            basis_latt[m:m+N] = np.sum([centers, atom],
-                                                  axis=0)
-            m += N
+
+        n = 0
+        for center in centers:
+            basis_latt[n:n+M] = center + basis
+            n += M
 
         xmax, xmin = np.amax(centers[:, 0]), np.amin(centers[:, 0])
         ymax, ymin = np.amax(centers[:, 1]), np.amin(centers[:, 1])
@@ -434,18 +458,21 @@ class LatticeScatteringMedium(ScatteringMedium):
     def get_conventional_cell(self):
         space_cc = self.space_lattice[:2, :2, :2]
         centers = self.ravel_ijk(space_cc)
+        
         if self.basis_structure is None:
             basis_structure = np.zeros(shape=(1, 3))
         else:
             basis_structure = self.basis_structure
 
+        # TODO: make sure that create_basis_lattice is consistent with this
         M = basis_structure.shape[0]
         N = centers.shape[0]
         basis_cc = np.zeros(shape=(M * N, 3))
-        m = 0
-        for atom in basis_structure:
-            basis_cc[m:m+N] = np.sum([centers, atom], axis=0)
-            m += N
+        n = 0
+
+        for center in centers:
+            basis_cc[n:n+M] = center + basis_structure
+            n += M
 
         xmax, xmin = np.amax(centers[:, 0]), np.amin(centers[:, 0])
         ymax, ymin = np.amax(centers[:, 1]), np.amin(centers[:, 1])
